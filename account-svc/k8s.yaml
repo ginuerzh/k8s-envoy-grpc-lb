@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grpc-lb
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account
+  namespace: grpc-lb
+spec:
+  replicas: 1
+  minReadySeconds: 10
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: account
+  template:
+    metadata:
+      name: account
+      labels:
+        app: account
+    spec:
+      containers:
+      - name: account-grpc
+        image: ginuerzh/account-svc:0.0.2
+        imagePullPolicy: Always
+        env:
+        - name: USER_ENDPOINT
+          value: user.grpc-lb:8000
+        ports:
+        - name: grpc
+          containerPort: 8000
+          protocol: TCP
+        readinessProbe:
+          periodSeconds: 10
+          initialDelaySeconds: 5
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:8000"]
+        livenessProbe:
+          periodSeconds: 10
+          initialDelaySeconds: 5
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:8000"]
+      - name: user-gw
+        image: ginuerzh/account-svc:0.0.2
+        imagePullPolicy: Always
+        command:
+        - /bin/account-gw
+        ports:
+        - name: web
+          containerPort: 8080
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: account
+  namespace: grpc-lb
+spec:
+  clusterIP: None
+  selector:
+    app: user
+  ports:
+  - name: grpc
+    port: 8000
+    targetPort: grpc
+  - name: web
+    port: 8080
+    targetPort: web
