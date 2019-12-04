@@ -27,10 +27,12 @@ spec:
       containers:
       - name: account-grpc
         image: ginuerzh/account-svc:0.0.2
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
+        - name: GRPC_PORT
+          value: "8000"
         - name: USER_ENDPOINT
-          value: user.grpc-lb:8000
+          value: "127.0.0.1:9002"
         ports:
         - name: grpc
           containerPort: 8000
@@ -45,15 +47,34 @@ spec:
           initialDelaySeconds: 5
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:8000"]
-      - name: user-gw
+      - name: account-gw
         image: ginuerzh/account-svc:0.0.2
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: GW_PORT
+          value: "8080"
+        - name: GRPC_PORT
+          value: "9001"
         command:
         - /bin/account-gw
         ports:
         - name: web
           containerPort: 8080
           protocol: TCP
+      - name: envoy
+        image: envoyproxy/envoy-alpine:v1.12.1
+        ports:
+        - name: ingress
+          containerPort: 9001
+        - name: admin
+          containerPort: 9000
+        volumeMounts:
+        - name: envoy-config
+          mountPath: /etc/envoy
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: envoy-account-config
 ---
 apiVersion: v1
 kind: Service
@@ -61,13 +82,12 @@ metadata:
   name: account
   namespace: grpc-lb
 spec:
-  clusterIP: None
   selector:
-    app: user
+    app: account
   ports:
-  - name: grpc
-    port: 8000
-    targetPort: grpc
-  - name: web
-    port: 8080
-    targetPort: web
+  - name: api
+    port: 9001
+    targetPort: 9001
+  - name: admin
+    port: 9000
+    targetPort: 9000
