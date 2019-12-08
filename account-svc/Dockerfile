@@ -9,21 +9,19 @@ ARG GOOS=linux
 ARG GOARCH=amd64
 
 RUN GOPROXY=$GOPROXY CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH GO111MODULE=on \
-    go build -o /app/account-grpc github.com/ginuerzh/k8s-envoy-grpc-lb/account-svc/grpc && \
+    go build --ldflags="-s -w" -o /app/account-grpc github.com/ginuerzh/k8s-envoy-grpc-lb/account-svc/grpc && \
     GOPROXY=$GOPROXY CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH GO111MODULE=on \
-    go build -o /app/account-gw github.com/ginuerzh/k8s-envoy-grpc-lb/account-svc/gw && \
+    go build --ldflags="-s -w" -o /app/account-gw github.com/ginuerzh/k8s-envoy-grpc-lb/account-svc/gw && \
     echo 'nobody:x:65534:' > /src/group.nobody && \
     echo 'nobody:x:65534:65534::/:' > /src/passwd.nobody && \
-    GRPC_HEALTH_PROBE_VERSION=v0.3.1 && \
-   wget -q -O /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 && \
+    cp /src/bin/grpc_health_probe /bin/grpc_health_probe && \
     chmod +x /bin/grpc_health_probe
 
 FROM scratch
 
-ENV GRPC_PORT=8000
-ENV GW_PORT=8080
-
+# GRPC port
 EXPOSE 8000
+# Gateway port
 EXPOSE 8080
 
 COPY --from=build /src/group.nobody /etc/group

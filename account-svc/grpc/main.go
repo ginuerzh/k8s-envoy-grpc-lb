@@ -20,25 +20,26 @@ import (
 )
 
 func main() {
-	port := os.Getenv("GRPC_PORT")
-	if port == "" {
-		port = "8000"
+	addr := os.Getenv("GRPC_ADDR")
+	if addr == "" {
+		addr = ":8000"
 	}
 
 	userEndpoint := os.Getenv("USER_ENDPOINT")
 	if userEndpoint == "" {
-		userEndpoint = "user.grpc-lb:8000"
+		userEndpoint = ":9000"
 	}
 
-	ln, err := net.Listen("tcp", ":"+port)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	log.Println("listening for user on port", port)
+	log.Println("listening for account grpc service on", addr)
 
 	s := grpc.NewServer(
 		grpc_middleware.WithUnaryServerChain(
 			unaryServerRecoveryInterceptor(),
+			unaryServerForwardTraceHeadersInterceptor(traceHeaders),
 			// unaryServerOpenTracingInterceptor(tracer),
 			// unaryServerAuthInterceptor(),
 			unaryServerLoggingInterceptor(),

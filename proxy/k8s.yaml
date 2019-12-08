@@ -55,3 +55,18 @@ spec:
   - name: admin
     port: 9000
     targetPort: 9000
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+    name: proxy
+    namespace: grpc-lb
+spec:
+  rules:
+  - host: api.grpc.lb
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: proxy
+          servicePort: web

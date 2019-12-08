@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tracing
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-collector
+  namespace: tracing
+spec:
+  replicas: 1
+  minReadySeconds: 10
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: jaeger
+      jaeger: collector
+  template:
+    metadata:
+      name: jaeger-collector
+      labels:
+        app: jaeger
+        jaeger: collector
+    spec:
+      containers:
+      - name: jaeger-collector
+        image: jaegertracing/jaeger-collector:1.15.1
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: kafka
+        - name: COLLECTOR_NUM_WORKERS
+          value: "4"
+        - name: COLLECTOR_QUEUE_SIZE
+          value: "100"
+        - name: LOG_LEVEL
+          value: info # other options: debug,warn,error,dpanic,panic,fatal
+        ports:
+        - name: web
+          containerPort: 14250
+        - name: admin
+          containerPort: 14269
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-query
+  namespace: tracing
+spec:
+  replicas: 1
+  minReadySeconds: 10
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: jaeger
+      jaeger: query
+  template:
+    metadata:
+      name: jaeger-query
+      labels:
+        app: jaeger
+        jaeger: query
+    spec:
+      containers:
+      - name: jaeger-query
+        image: jaegertracing/jaeger-query:1.15.1
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: kafka
+        - name: LOG_LEVEL
+          value: info # other options: debug,warn,error,dpanic,panic,fatal
+        ports:
+        - name: grpc
+          containerPort: 16686
+        - name: admin
+          containerPort: 16687
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: tracing
+spec:
+  selector:
+    app: jaeger
+    jaeger: collector
+  ports:
+  - name: grpc
+    port: 14250
+    targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: tracing
+spec:
+  selector:
+    app: jaeger
+    jaeger: query
+  ports:
+  - name: web
+    port: 16686
+    targetPort: web
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+    name: jaeger
+    namespace: tracing
+spec:
+  rules:
+  - host: jaeger.grpc.lb
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: jaeger-query
+          servicePort: web

@@ -18,13 +18,16 @@ import (
 func unaryServerLoggingInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		md, _ := metadata.FromIncomingContext(ctx)
+		log.Println("info:", info.FullMethod, info.Server)
 		log.Println("incoming md:", md)
+
 		md, _ = metadata.FromOutgoingContext(ctx)
 		log.Println("outgoing md:", md)
 
-		log.Println("info:", info.FullMethod, info.Server)
 		log.Println("req:", req)
+
 		resp, err = handler(ctx, req)
+
 		log.Println("resp:", resp)
 		return
 	}
@@ -54,4 +57,42 @@ func unaryServerRecoveryInterceptor() grpc.UnaryServerInterceptor {
 
 func unaryServerOpenTracingInterceptor(tracer opentracing.Tracer) grpc.UnaryServerInterceptor {
 	return grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(tracer))
+}
+
+var (
+	// trace header to propagate.
+	traceHeaders = []string{
+		"x-ot-span-context",
+		"x-request-id",
+
+		// Zipkin headers
+		"b3",
+		"x-b3-traceid",
+		"x-b3-spanid",
+		"x-b3-parentspanid",
+		"x-b3-sampled",
+		"x-b3-flags",
+
+		// Jaeger header (for native client)
+		"uber-trace-id",
+	}
+)
+
+func unaryServerForwardTraceHeadersInterceptor(eaders []string) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+		var kv []string
+		md, _ := metadata.FromIncomingContext(ctx)
+		if md.Len() > 0 {
+			for _, k := range traceHeaders {
+				if v := md.Get(k); len(v) > 0 {
+					kv = append(kv, k, v[0])
+				}
+			}
+		}
+		if len(kv) > 0 {
+			ctx = metadata.AppendToOutgoingContext(ctx, kv...)
+		}
+
+		return handler(ctx, req)
+	}
 }

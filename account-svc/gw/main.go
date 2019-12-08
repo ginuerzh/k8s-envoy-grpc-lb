@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	api "github.com/ginuerzh/k8s-envoy-grpc-lb/account-svc/api"
 
@@ -14,29 +15,58 @@ import (
 	"google.golang.org/grpc"
 )
 
+var (
+	// trace header to propagate.
+	traceHeaders = []string{
+		"x-ot-span-context",
+		"x-request-id",
+
+		// Zipkin headers
+		"b3",
+		"x-b3-traceid",
+		"x-b3-spanid",
+		"x-b3-parentspanid",
+		"x-b3-sampled",
+		"X-b3-flags",
+
+		// Jaeger header (for native client)
+		"uber-trace-id",
+	}
+)
+
+func incomingHeaderMatcherFunc(key string) (string, bool) {
+	k := strings.ToLower(key)
+	for _, v := range traceHeaders {
+		if v == k {
+			return key, true
+		}
+	}
+	return runtime.DefaultHeaderMatcher(key)
+}
+
 func run() error {
-	grpcPort := os.Getenv("GRPC_PORT")
-	if grpcPort == "" {
-		grpcPort = "8000"
+	grpcEndpoint := os.Getenv("GRPC_ENDPOINT")
+	if grpcEndpoint == "" {
+		grpcEndpoint = ":8000"
 	}
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	mux := runtime.NewServeMux()
+	mux := runtime.NewServeMux(runtime.WithIncomingHeaderMatcher(incomingHeaderMatcherFunc))
 	opts := []grpc.DialOption{grpc.WithInsecure()}
-	if err := api.RegisterAccountHandlerFromEndpoint(ctx, mux, ":"+grpcPort, opts); err != nil {
+	if err := api.RegisterAccountHandlerFromEndpoint(ctx, mux, grpcEndpoint, opts); err != nil {
 		return err
 	}
 
-	gwPort := os.Getenv("GW_PORT")
-	if gwPort == "" {
-		gwPort = "8080"
+	gwAddr := os.Getenv("GW_ADDR")
+	if gwAddr == "" {
+		gwAddr = ":8080"
 	}
-	log.Printf("listening on port %s forward to %s", gwPort, grpcPort)
+	log.Printf("listening on %s forward to %s", gwAddr, grpcEndpoint)
 
-	return http.ListenAndServe(":"+gwPort, mux)
+	return http.ListenAndServe(gwAddr, mux)
 }
 
 func main() {

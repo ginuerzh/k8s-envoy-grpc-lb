@@ -18,14 +18,16 @@ import (
 func unaryServerLoggingInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		md, _ := metadata.FromIncomingContext(ctx)
+		log.Println("info:", info.FullMethod, info.Server)
 		log.Println("incoming md:", md)
+		log.Println("req:", req)
+
+		resp, err = handler(ctx, req)
+
 		md, _ = metadata.FromOutgoingContext(ctx)
 		log.Println("outgoing md:", md)
-
-		log.Println("info:", info.FullMethod, info.Server)
-		log.Println("req:", req)
-		resp, err = handler(ctx, req)
 		log.Println("resp:", resp)
+
 		return
 	}
 }

@@ -9,7 +9,7 @@ metadata:
   name: account
   namespace: grpc-lb
 spec:
-  replicas: 1
+  replicas: 3
   minReadySeconds: 10
   strategy:
     rollingUpdate:
@@ -26,11 +26,11 @@ spec:
     spec:
       containers:
       - name: account-grpc
-        image: ginuerzh/account-svc:0.0.2
+        image: ginuerzh/account-svc:0.0.4
         imagePullPolicy: IfNotPresent
         env:
-        - name: GRPC_PORT
-          value: "8000"
+        - name: GRPC_ADDR
+          value: ":8000"
         - name: USER_ENDPOINT
           value: "127.0.0.1:9002"
         ports:
@@ -48,13 +48,13 @@ spec:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:8000"]
       - name: account-gw
-        image: ginuerzh/account-svc:0.0.2
+        image: ginuerzh/account-svc:0.0.4
         imagePullPolicy: IfNotPresent
         env:
-        - name: GW_PORT
-          value: "8080"
-        - name: GRPC_PORT
-          value: "9001"
+        - name: GW_ADDR
+          value: ":8080"
+        - name: GRPC_ENDPOINT
+          value: "127.0.0.1:9001"
         command:
         - /bin/account-gw
         ports:
@@ -82,6 +82,7 @@ metadata:
   name: account
   namespace: grpc-lb
 spec:
+  clusterIP: None
   selector:
     app: account
   ports:
