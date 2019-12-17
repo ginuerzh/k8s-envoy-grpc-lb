@@ -17,7 +17,7 @@ RUN GOPROXY=$GOPROXY CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH GO111MODULE=on \
     cp /src/bin/grpc_health_probe /bin/grpc_health_probe && \
     chmod +x /bin/grpc_health_probe
 
-FROM scratch
+FROM alpine
 
 # GRPC port
 EXPOSE 8000
