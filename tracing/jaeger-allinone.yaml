@@ -26,9 +26,18 @@ spec:
         app: jaeger
         jaeger: all-in-one
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       containers:
       - name: jaeger
         image: jaegertracing/all-in-one:1.15.1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 50Mi
+          limits:
+            cpu: 500m
+            memory: 100Mi
         env:
         - name: SPAN_STORAGE_TYPE
           value: memory

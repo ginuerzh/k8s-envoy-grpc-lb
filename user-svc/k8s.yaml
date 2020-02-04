@@ -24,6 +24,8 @@ spec:
       labels:
         app: user
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       containers:
       - name: user-grpc
         image: ginuerzh/user-svc:0.0.5
